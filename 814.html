@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>哥特召唤术式 · Arcana Obscura</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=UnifrakturCook:wght@700&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0b10;
+    --ink:#e6dccb;
+    --accent:#a31419;     /* 主色：随阵型切换 */
+    --accent-2:#4a0a0f;   /* 次色：随阵型切换 */
+    --glow: #f03c3c;
+    --rune: #c7bba3;
+    --panel:#0d0d12;
+    --panel-ink:#b9b2a5;
+    --muted:#6a645a;
+    --good:#64d2a3;
+    --warn:#d2a364;
+    --bad:#e07b7b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);overflow:hidden;color:var(--ink);font-family: "Cinzel","IM Fell English SC",serif;cursor:none}
+  /* 背景：深邃放射+暗纹噪点+渐变雾 */
+  body:before{
+    content:"";
+    position:fixed;inset:0;
+    background:
+      radial-gradient(1200px 1200px at 50% 48%, rgba(90,40,40,.20), transparent 60%),
+      radial-gradient(900px 900px at 50% 52%, rgba(40,60,90,.15), transparent 65%),
+      radial-gradient(1200px 900px at 50% -10%, rgba(255,255,210,.06), transparent 60%),
+      conic-gradient(from 180deg at 50% 50%, rgba(255,255,255,.02), rgba(0,0,0,.02));
+    mix-blend-mode:screen;pointer-events:none;z-index:0;
+  }
+  body:after{
+    content:"";
+    position:fixed;inset:0;
+    background-image:url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>\
+      <filter id='n'><feTurbulence baseFrequency='.9' numOctaves='1' seed='7'/><feComponentTransfer>\
+      <feFuncR type='discrete' tableValues='0 1'/><feFuncG type='discrete' tableValues='0 1'/>\
+      <feFuncB type='discrete' tableValues='0 1'/></feComponentTransfer></filter>\
+      <rect width='120' height='120' filter='url(%23n)' opacity='.028'/>\
+      </svg>");
+    opacity:.6;pointer-events:none;z-index:0;
+  }
+
+  .app{
+    display:grid;grid-template-columns: 320px 1fr;
+    grid-template-rows:auto 1fr; gap:0;
+    height:100%;position:relative;z-index:1;
+  }
+  @media(max-width: 1000px){
+    .app{grid-template-columns:1fr;grid-template-rows: auto auto 1fr}
+  }
+
+  /* 召唤阵区域 */
+  .stage{
+    position:relative;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  .stage .canvas-wrap{position:absolute;inset:0;pointer-events:none}
+  #particles{position:absolute;inset:0}
+  .circle-wrap{
+    position:relative;width:min(90vmin,900px);height:min(90vmin,900px);
+    filter: drop-shadow(0 0 10px rgba(220,170,120,.06)) drop-shadow(0 0 24px rgba(220,170,120,.04));
+  }
+  svg#circle{width:100%;height:100%;display:block;overflow:visible}
+  .glow{filter:url(#glow)}
+  .softglow{filter:url(#softglow)}
+  .runes text{font-family:"UnifrakturCook","IM Fell English SC",serif;letter-spacing:.06em}
+  .runes .ringtext{fill:var(--rune);opacity:.9}
+  .runes .ringtext.alt{opacity:.4}
+  .spin-slow{animation:spin 120s linear infinite}
+  .spin-mid{animation:spin 48s linear infinite}
+  .spin-fast{animation:spin 12s linear infinite}
+  .pulse{animation:pulse 3s ease-in-out infinite}
+  .flicker{animation:flicker 4s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{
+    0%,100%{opacity:.85}
+    50%{opacity:1; filter: drop-shadow(0 0 12px var(--glow))}
+  }
+  @keyframes flicker{
+    0%, 19%, 21%, 23%, 80%, 100%{ opacity:.9 }
+    20%, 22%, 24%{ opacity:.65 }
+    55%{ opacity:.78 }
+  }
+
+  /* 掉落目标（阵心） */
+  .drop-target{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:180px;height:180px;border-radius:50%;
+    border:1px dashed rgba(220,210,180,.18);
+    box-shadow: inset 0 0 24px rgba(240,210,180,.06);
+    transition:all .25s ease;
+    /* pointer-events:none; <-- This was the problem */
+  }
+  .drop-target.active{
+    border-color:var(--ink);
+    box-shadow: inset 0 0 30px rgba(250,230,200,.18), 0 0 30px rgba(250,230,200,.12);
+    transform:translate(-50%,-50%) scale(1.06);
+  }
+
+  /* 顶部：阵型切换 */
+  .topbar{
+    grid-column:1/-1; display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; background:linear-gradient(to right, rgba(20,20,28,.85), rgba(12,12,16,.6));
+    border-bottom:1px solid rgba(200,190,160,.1);
+  }
+  .brand{display:flex;gap:10px;align-items:baseline}
+  .brand h1{font-family:"IM Fell English SC",serif; font-size:20px; letter-spacing:.2em; margin:0;color:var(--ink)}
+  .switcher{display:flex; gap:10px}
+  .sigil-btn{
+    position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;
+    min-width:96px;padding:8px 10px;background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.04));
+    border:1px solid rgba(220,210,190,.14); color:var(--panel-ink); text-align:center; cursor:pointer;
+    transition:all .25s ease; user-select:none
+  }
+  .sigil-btn .icon{font-size:20px; line-height:1}
+  .sigil-btn small{font-family:"IM Fell English SC",serif;letter-spacing:.1em;color:var(--muted)}
+  .sigil-btn.active{color:var(--ink);border-color:var(--ink); box-shadow:inset 0 0 20px rgba(255,230,200,.06), 0 0 12px rgba(255,230,200,.04)}
+  .sigil-btn:hover{transform:translateY(-1px)}
+  /* 祭品面板 */
+  .panel{
+    background: radial-gradient(800px 400px at 10% 0%, rgba(120,90,50,.08), transparent 60%), var(--panel);
+    border-right:1px solid rgba(200,190,160,.12);
+    padding:12px 12px 8px 12px; position:relative;
+  }
+  .panel h2{font-size:16px; letter-spacing:.2em; margin:4px 2px 12px;color:var(--ink)}
+  .rules{font-family:"IM Fell English SC"; font-size:13px;color:var(--muted);line-height:1.2;margin-bottom:10px}
+  .offer-list{
+    display:grid;grid-template-columns:repeat(2, 1fr); gap:8px; max-height:calc(100vh - 210px);
+    overflow:auto; padding-right:4px; scrollbar-width:thin;
+  }
+  .offer{
+    border:1px solid rgba(220,210,180,.14);
+    padding:8px; min-height:60px; display:flex; gap:10px; align-items:center; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.05));
+    transition:all .2s ease; user-select:none
+  }
+  .offer .sym{
+    width:36px;height:36px;border:1px solid rgba(220,210,180,.2);display:flex;align-items:center;justify-content:center;
+    font-size:20px; font-family:"UnifrakturCook","Cinzel"; color:var(--ink); background: rgba(255,255,255,.02);
+  }
+  .offer .txt{display:flex;flex-direction:column;line-height:1.1}
+  .offer b{font-size:12px}
+  .offer small{font-size:11px;color:var(--muted)}
+  .offer[draggable="true"]{cursor:grab}
+  .offer:active{cursor:grabbing}
+  .offer:hover{transform:translateY(-1px); border-color:rgba(250,240,210,.25)}
+  .panel .footer{
+    margin-top:8px;display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px
+  }
+  .chips{display:flex; gap:6px;flex-wrap:wrap;padding:8px 2px}
+  .chip{border:1px dashed rgba(220,210,180,.2); padding:4px 8px; font-size:12px;color:var(--panel-ink); background:rgba(255,255,255,.03)}
+  .progress{font-family:"IM Fell English SC"; letter-spacing:.2em}
+  @media(max-width: 1000px){
+    .panel{order:2; border-right:none; border-top:1px solid rgba(200,190,160,.12)}
+    .offer-list{grid-template-columns:repeat(5,1fr); max-height:none}
+  }
+
+  /* 提示与故事Modal */
+  .toast{
+    position:fixed; left:50%; top:6%; transform:translateX(-50%);
+    padding:6px 12px; background:rgba(20,20,26,.84); border:1px solid rgba(220,210,180,.2);
+    color:var(--panel-ink); font-size:13px; z-index:50; pointer-events:none
+  }
+  .summon-overlay{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:30;
+    background: radial-gradient(circle at 50% 50%, rgba(20,8,8,.9), rgba(0,0,0,.94) 60%, rgba(0,0,0,.98));
+    animation:fadein .35s ease both;
+  }
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+  .summon-card{
+    width:min(860px, 92vw); border:1px solid rgba(255,240,200,.24);
+    background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.06)); padding:20px;
+    box-shadow:0 0 40px rgba(200,160,120,.1), inset 0 0 80px rgba(255,230,200,.04);
+    position:relative; overflow:hidden;
+  }
+  .summon-card h3{font-size:26px;margin:0 0 10px}
+  .summon-card p{font-size:14px; line-height:1.6; color:#d6d1c7}
+  .summon-card .name{font-family:"IM Fell English SC";letter-spacing:.2em}
+  .card-glow{position:absolute; inset:-2px; pointer-events:none; border:1px solid rgba(250,230,210,.08)}
+  .close-hint{position:absolute; right:12px; top:8px; font-size:12px; color:var(--muted)}
+
+  /* 光标系统 */
+  .cursor-dot,.cursor-ring{
+    position:fixed; left:0; top:0; pointer-events:none; z-index:60; mix-blend-mode:screen
+  }
+  .cursor-dot{width:6px;height:6px;border-radius:50%;background:radial-gradient(circle, #fff, var(--glow))}
+  .cursor-ring{width:24px;height:24px;border-radius:50%; border:1px solid rgba(250,240,220,.35);box-shadow:0 0 12px rgba(250,220,190,.1) inset}
+  .rune-tail{
+    position:fixed; font-family:"UnifrakturCook"; font-size:16px;color:var(--ink); opacity:.85; pointer-events:none;
+    text-shadow:0 0 6px var(--glow);
+    animation:tailfade .8s ease-out forwards;
+  }
+  @keyframes tailfade{
+    0%{opacity:1; transform:translateY(0) scale(1)}
+    100%{opacity:0; transform:translateY(-16px) scale(0.9)}
+  }
+
+  /* 召唤冲击波/火焰/落叶/星尘等效果容器 */
+  .fx-layer{position:absolute; inset:0; pointer-events:none}
+  .shockwave{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:80px; height:80px; border-radius:50%; border:1px solid rgba(255,230,200,.7);
+    box-shadow:0 0 10px rgba(255,230,200,.5);
+    animation:shock .9s ease-out forwards;
+  }
+  @keyframes shock{
+    from{opacity:1; transform:translate(-50%,-50%) scale(.6)}
+    to{opacity:0; transform:translate(-50%,-50%) scale(6)}
+  }
+  .ember,.leaf,.stardust,.shadow-mote,.bubble{
+    position:absolute; width:4px; height:4px; border-radius:50%; opacity:.9
+  }
+
+  /* SVG滤镜 */
+  svg#circle defs + g {}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>ARCANA OBSCURA</h1>
+      <div class="rules">拖入任意三件祭品到阵心唤起异界来客。可切换核心法阵，改变召唤谱系。</div>
+    </div>
+    <div class="switcher">
+      <div class="sigil-btn active" data-core="infernal" title="地狱法阵·Infernum">
+        <div class="icon">✠</div>
+        <small>INFERNUM</small>
+      </div>
+      <div class="sigil-btn" data-core="sylvan" title="密林法阵·Sylva">
+        <div class="icon">✽</div>
+        <small>SYLVA</small>
+      </div>
+      <div class="sigil-btn" data-core="astral" title="星界法阵·Astra">
+        <div class="icon">✶</div>
+        <small>ASTRA</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>祭品选单</h2>
+    <div class="rules">每次随机 10 件，拖拽符号至阵心。选定 3 件即刻发动。</div>
+    <div class="offer-list" id="offerList"></div>
+    <div class="chips" id="chips"></div>
+    <div class="footer">
+      <div class="progress" id="progress">已选 0 / 3</div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-wrap">
+      <canvas id="particles"></canvas>
+    </div>
+    <div class="circle-wrap">
+      <svg id="circle" viewBox="-480 -480 960 960" aria-label="summoning-circle">
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="B"/>
+            <feMerge><feMergeNode in="B"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="softglow">
+            <feGaussianBlur stdDeviation="1.5" result="B"/>
+            <feMerge><feMergeNode in="B"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <radialGradient id="gold" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#f6e7c1"/><stop offset="100%" stop-color="#8a6b3e"/>
+          </radialGradient>
+          <linearGradient id="scarlet" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7a1016"/><stop offset="100%" stop-color="#30090c"/>
+          </linearGradient>
+          <path id="runePathOuter" d="M 0 -360 A 360 360 0 1 1 -0.01 -360 Z"/>
+          <path id="runePathInner" d="M 0 -280 A 280 280 0 1 1 -0.01 -280 Z"/>
+        </defs>
+
+        <g id="designs"></g>
+
+        <g class="runes spin-mid" style="mix-blend-mode:screen">
+          <text class="ringtext" font-size="28">
+            <textPath href="#runePathOuter" startOffset="0%">
+              ᚠᚢᚦᚨᚱ ᚲᚷᚹᚺ ᚾᛁᛃᛇ ᛈᛉᛊᛏ ᛒᛖᛗᛚ ᛜ — ᛫ ᛬ ᛭ ᛮ ᛯ ᛰ — ᚠᚢᚦᚨᚱ ᚲᚷᚹᚺ ᚾᛁᛃᛇ ᛈᛉᛊᛏ ᛒᛖᛗᛚ ᛜ
+            </textPath>
+          </text>
+          <text class="ringtext alt" font-size="18">
+            <textPath href="#runePathInner" startOffset="50%">
+              ♄ ☿ ♃ ♀ ♂ ☉ ☽ ⊕ ✢ ✣ ✧ ✶ ✷ ✹ ✺ ✵ ✦ ✴ ✸ ✹ ✶ ✷ ✸ ✴ ✦ ✢ ✣
+            </textPath>
+          </text>
+        </g>
+      </svg>
+
+      <div class="fx-layer" id="fxLayer"></div>
+      <div class="drop-target" id="dropTarget"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" style="display:none;"></div>
+
+<div class="summon-overlay" id="summonOverlay" role="dialog" aria-modal="true">
+  <div class="summon-card">
+    <div class="close-hint">数秒后自动重置</div>
+    <div class="card-glow"></div>
+    <h3><span class="name" id="summonTitle"></span></h3>
+    <p id="summonStory"></p>
+  </div>
+</div>
+
+<div class="cursor-dot" id="cDot"></div>
+<div class="cursor-ring" id="cRing"></div>
+
+<script>
+;(() => {
+  /* 全局状态 */
+  const state = {
+    core: 'infernal',      // 当前阵型 infernal/sylvan/astral
+    selected: [],          // 已投祭品 id
+    pool: [],              // 当前面板随机10
+    offerings: [],         // 全量祭品表
+  };
+
+  /* 配色集 */
+  const themes = {
+    infernal: {accent:'#a31419', accent2:'#3e0a0f', glow:'#ff3a2f'},
+    sylvan:   {accent:'#267a54', accent2:'#0f3a2a', glow:'#66e0b1'},
+    astral:   {accent:'#4b5f9e', accent2:'#1a203a', glow:'#8aa8ff'},
+  };
+
+  /* 初始化符号祭品（≥60） */
+  const O = (id,name,symbol,tags)=>({id,name,symbol,tags});
+  state.offerings = [
+    // 血影/冥渊
+    O('vial_blood','血之小瓶','🜇',['blood','dark','ritual']),
+    O('bone_dust','骨灰末','✶',['death','earth','dark']),
+    O('grave_soil','墓土','✴',['earth','death','dark']),
+    O('raven_quill','渡鸦羽','✢',['air','omen','shadow']),
+    O('nightshade','曼陀罗种','✧',['herb','poison','shadow']),
+    O('obsidian','黑曜碎片','◇',['earth','shadow','fire']),
+    O('bat_wing','蝠翼膜','⋄',['air','night','shadow']),
+    O('iron_nail','铁钉','⊗',['iron','order','earth']),
+    O('black_candle','黑烛','✠',['ritual','dark','fire']),
+    O('mirror_shard','镜之碎片','◐',['mirror','illusion','moon']),
+
+    // 星辉/银辉
+    O('moonstone','月长石','☽',['moon','silver','astral']),
+    O('starchart','星图纸','✹',['star','astral','order']),
+    O('meteor_iron','陨铁屑','⛒',['iron','star','astral']),
+    O('silver_dust','银屑','☾',['silver','purify','moon']),
+    O('aurora_thread','极光丝','⋆',['light','air','astral']),
+    O('aether_quartz','以太晶','✵',['aether','astral','order']),
+    O('comet_salt','彗星盐','✲',['salt','star','astral']),
+    O('hourglass_grain','沙漏末砂','⌛',['time','order','earth']),
+    O('astral_ink','星辉墨','✒',['astral','ritual','script']),
+    O('runic_chalk','符文白垩','⨁',['script','earth','ritual']),
+
+    // 林海/古木
+    O('oak_leaf','橡叶','❧',['wood','nature','life']),
+    O('mistletoe','槲寄生','✿',['herb','nature','light']),
+    O('mandrake','曼德拉草根','⚘',['herb','earth','life']),
+    O('wolfsbane','狼毒','✥',['herb','beast','moon']),
+    O('moss','古苔','❖',['earth','nature','water']),
+    O('lotus','莲瓣','✽',['water','lotus','life']),
+    O('amber','琥珀','◈',['amber','sun','ancient']),
+    O('pine_resin','松脂','✤',['resin','fire','nature']),
+    O('rose_thorn','蔷薇刺','✣',['thorn','life','blood']),
+    O('leaf_scroll','叶纹卷','⟆',['script','nature','order']),
+
+    // 元素/炼金
+    O('sulfur','硫磺','🜍',['sulfur','fire','alch']),
+    O('mercury','水银','☿',['mercury','fluid','alch']),
+    O('sea_salt','海盐','🜔',['salt','water','purify']),
+    O('spring_water','泉水','🜄',['water','life','purify']),
+    O('coal','煤屑','🜂',['fire','earth','dark']),
+    O('tektite','雷化玻璃','△',['storm','fire','glass']),
+    O('storm_sand','风暴砂','∿',['air','storm','chaos']),
+    O('cinder','灰烬','꙰',['fire','death','air']),
+    O('lead_pebble','铅丸','♄',['lead','earth','alch']),
+    O('copper_coil','铜环','♃',['copper','order','alch']),
+    O('gold_leaf','金箔','☉',['gold','sun','light']),
+    O('tin_bead','锡珠','♁',['tin','earth','alch']),
+
+    // 海渊/潮汐
+    O('pearl','珠母','◍',['water','moon','purify']),
+    O('coral','珊瑚屑','◌',['water','life','nature']),
+    O('sea_foam','海沫瓶','◜',['water','air','aether']),
+    O('kraken_scale','海妖鳞粉','◒',['water','deep','beast']),
+
+    // 影与虚空
+    O('void_sand','虚空砂','⬮',['void','shadow','astral']),
+    O('umbral_salt','幽影盐','⬯',['shadow','salt','purify']),
+    O('shade_filament','影丝','⟡',['shadow','aether','night']),
+    O('black_ink','炭墨','⏵',['script','dark','ritual']),
+
+    // 圣与光
+    O('sun_ash','日灰','☉',['sun','light','purify']),
+    O('holy_oil','圣油','✙',['light','ritual','life']),
+    O('prayer_strip','祷符','✚',['script','order','light']),
+
+    // 工艺/契约
+    O('wax_seal','蜡印','⃝',['seal','order','ritual']),
+    O('sigil_plate','铭板','⟐',['metal','order','script']),
+    O('binding_thread','缚线','⌁',['order','bond','ritual']),
+    O('ancient_coin','古币','◳',['ancient','metal','fate']),
+    O('mirror_ink','镜墨','◑',['mirror','moon','illusion']),
+
+    // 野性/兽性
+    O('wolf_fur','狼毛','ᛉ',['beast','moon','wild']),
+    O('stag_horn','鹿角片','ᚨ',['beast','nature','ancient']),
+    O('serpent_scale','蛇鳞','ᛇ',['beast','poison','shadow']),
+    O('spider_silk','蛛丝','ᚢ',['beast','bond','shadow']),
+
+    // 其余
+    O('thornvine','荆棘蔓','✵',['thorn','nature','blood']),
+    O('quartz_clear','水晶','◆',['glass','order','aether']),
+    O('inkstone','砚屑','▣',['earth','script','order']),
+    O('saltpetre','硝石','⬘',['fire','salt','alch']),
+    O('hemlock','毒芹','✦',['herb','poison','shadow']),
+    O('lunar_milk','月乳','◓',['moon','life','silver']),
+    O('starlit_ember','星火灰','✷',['star','fire','astral']),
+    O('echo_bell','回声铃舌','◬',['sound','order','astral']),
+    O('thorn_eye','棘之眼','◪',['thorn','omen','void']),
+    O('veil_cloth','幽幕布','▵',['shadow','illusion','night']),
+    O('sable_powder','紫貂粉','▿',['beast','shadow','night']),
+    O('warden_key','守门钥','⌖',['order','iron','seal']),
+    O('oracle_seed','神谕籽','❂',['ancient','fate','sun']),
+    O('dawn_petal','拂晓瓣','❁',['sun','light','life']),
+    O('dusk_ember','暮色炭','❂',['night','fire','shadow'])
+  ];
+  // 去重符号（上例中个别符号重复仅作风格用途）
+
+  /* 三种召唤阵生成 */
+  function buildDesigns(){
+    const g = document.getElementById('designs');
+    g.innerHTML = '';
+    const groups = {
+      infernal: buildInfernal(),
+      sylvan: buildSylvan(),
+      astral: buildAstral()
+    };
+    g.append(groups.infernal, groups.sylvan, groups.astral);
+    switchDesign('infernal');
+  }
+
+  function circleEl(r, cls='', strokeW=1){
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',0); c.setAttribute('cy',0); c.setAttribute('r', r);
+    c.setAttribute('fill','none');
+    c.setAttribute('stroke','url(#gold)');
+    c.setAttribute('stroke-width', strokeW);
+    if(cls) c.setAttribute('class', cls);
+    c.setAttribute('opacity','.95');
+    return c;
+  }
+  function polygon(points, cls='', strokeW=1){
+    const p = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    p.setAttribute('points', points.map(pt=>pt.join(',')).join(' '));
+    p.setAttribute('fill','none');
+    p.setAttribute('stroke','url(#gold)');
+    p.setAttribute('stroke-width', strokeW);
+    if(cls) p.setAttribute('class', cls);
+    return p;
+  }
+  function path(d, cls='', strokeW=1){
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill','none');
+    p.setAttribute('stroke','url(#gold)');
+    p.setAttribute('stroke-width', strokeW);
+    if(cls) p.setAttribute('class', cls);
+    return p;
+  }
+  function starPoints(R=220,r=90, spikes=5, rot=-90){
+    const pts = [];
+    const step = Math.PI/spikes;
+    for(let i=0;i<spikes*2;i++){
+      const ang = (rot*Math.PI/180) + i*step;
+      const rad = i%2===0 ? R : r;
+      pts.push([Math.cos(ang)*rad, Math.sin(ang)*rad]);
+    }
+    return pts;
+  }
+  function regularPolygon(n=6, R=200, rot=-90){
+    const pts=[];
+    for(let i=0;i<n;i++){
+      const ang = (rot*Math.PI/180) + i*(2*Math.PI/n);
+      pts.push([Math.cos(ang)*R, Math.sin(ang)*R]);
+    }
+    return pts;
+  }
+
+  function buildInfernal(){
+    const g = svgGroup('design infernal spin-slow');
+    g.setAttribute('data-core','infernal');
+
+    g.append(
+      circleEl(360,'glow',1.2),
+      circleEl(330,'',1),
+      circleEl(290,'',1),
+      circleEl(250,'',1)
+    );
+    // 倒五芒星
+    g.append(polygon(starPoints(230,92,5,90),'glow',1.4));
+    // 六芒护印（外）
+    g.append(polygon(regularPolygon(3,190,30),'',1.0));
+    g.append(polygon(regularPolygon(3,190,210),'',1.0));
+    // 尖刺能量路径
+    g.append(path('M0 -260 L 0 -330 M0 260 L 0 330 M-260 0 L -330 0 M260 0 L 330 0','',1));
+    // 内部齿圈
+    for(let i=0;i<24;i++){
+      const ang = i*15; const r1=270,r2=280;
+      g.append(path(arcSeg(r1,r2,ang,6),'',1));
+    }
+    // 中心阵眼
+    g.append(circleEl(140,'pulse',1.2), circleEl(70,'',1));
+
+    return g;
+  }
+
+  function buildSylvan(){
+    const g = svgGroup('design sylvan spin-slow');
+    g.setAttribute('data-core','sylvan');
+
+    g.append(
+      circleEl(360,'glow',1.2),
+      circleEl(320,'',1),
+      circleEl(280,'',1)
+    );
+    // 莲瓣（12瓣）
+    for(let i=0;i<12;i++){
+      const petal = path(petalPath(0,-210,60,180), 'softglow',1);
+      petal.setAttribute('transform', `rotate(${i*30})`);
+      g.append(petal);
+    }
+    // 三重结（以三圆模拟三位结）
+    g.append(circleEl(160,'',1), circleEl(160,'',1), circleEl(160,'',1));
+    g.lastChild.setAttribute('transform','rotate(120)');
+    g.lastChild.previousSibling.setAttribute('transform','rotate(240)');
+
+    // 节点
+    const npts = regularPolygon(6,200,0);
+    npts.forEach(p=>{
+      g.append(nodeDot(p[0],p[1]));
+    });
+
+    g.append(circleEl(120,'pulse',1.2), circleEl(60,'',1));
+    return g;
+  }
+
+  function buildAstral(){
+    const g = svgGroup('design astral spin-slow');
+    g.setAttribute('data-core','astral');
+
+    g.append(
+      circleEl(360,'glow',1.2),
+      circleEl(330,'',1),
+      circleEl(300,'',1),
+      circleEl(240,'',1)
+    );
+    // 六角星+立方体风格线
+    g.append(polygon(regularPolygon(6,210,-90),'',1.1));
+    g.append(polygon(regularPolygon(3,210,30),'',1.0));
+    g.append(polygon(regularPolygon(3,210,210),'',1.0));
+    // 连线（近似立体）
+    const pts = regularPolygon(6,210,-90);
+    for(let i=0;i<6;i++){
+      const a = pts[i], b=pts[(i+2)%6];
+      g.append(path(`M${a[0]} ${a[1]} L ${b[0]} ${b[1]}`,'',1));
+    }
+    // 同心环
+    g.append(circleEl(180,'',1), circleEl(140,'',1));
+    // 星宿节点
+    for(let i=0;i<12;i++){
+      const ang = i*30 * Math.PI/180;
+      const x = Math.cos(ang)*170, y = Math.sin(ang)*170;
+      g.append(nodeDot(x,y));
+    }
+    g.append(circleEl(90,'pulse',1.2), circleEl(50,'',1));
+    return g;
+  }
+
+  function svgGroup(cls=''){ const g = document.createElementNS('http://www.w3.org/2000/svg','g'); if(cls) g.setAttribute('class',cls); return g; }
+  function nodeDot(x,y){
+    const d = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    d.setAttribute('cx',x); d.setAttribute('cy',y); d.setAttribute('r',3.6);
+    d.setAttribute('fill','url(#gold)'); d.setAttribute('class','glow');
+    return d;
+  }
+  function arcSeg(r1,r2, ang, len){
+    const a0 = (Math.PI/180)*(ang - len/2);
+    const a1 = (Math.PI/180)*(ang + len/2);
+    const p0 = [Math.cos(a0)*r1, Math.sin(a0)*r1];
+    const p1 = [Math.cos(a1)*r2, Math.sin(a1)*r2];
+    return `M${p0[0]} ${p0[1]} A ${r1} ${r1} 0 0 1 ${Math.cos(a1)*r1} ${Math.sin(a1)*r1} L ${p1[0]} ${p1[1]}`;
+  }
+  function petalPath(x,y,rx,ry){
+    return `M${x} ${y} C ${x-rx} ${y+ry*0.55}, ${x+rx} ${y+ry*0.55}, ${x} ${y}`;
+  }
+
+  /* 阵型切换与主题 */
+  function switchDesign(core){
+    state.core = core;
+    document.querySelectorAll('.sigil-btn').forEach(b=>b.classList.toggle('active', b.dataset.core===core));
+    // 显隐
+    document.querySelectorAll('#designs .design').forEach(g=>{
+      g.style.display = (g.getAttribute('data-core')===core) ? 'block':'none';
+    });
+    // 主题色
+    const t = themes[core];
+    document.documentElement.style.setProperty('--accent', t.accent);
+    document.documentElement.style.setProperty('--accent-2', t.accent2);
+    document.documentElement.style.setProperty('--glow', t.glow);
+    // 粒子颜色更新
+    particleColor = t.glow;
+  }
+
+  /* UI：祭品面板 */
+  function randomPool(){
+    // 随机10
+    const idx = [...Array(state.offerings.length).keys()];
+    shuffle(idx);
+    state.pool = idx.slice(0,10).map(i=>state.offerings[i]);
+    renderOffers();
+  }
+  function renderOffers(){
+    const list = document.getElementById('offerList');
+    list.innerHTML = '';
+    state.pool.forEach(off=>{
+      const el = document.createElement('div');
+      el.className = 'offer';
+      el.setAttribute('draggable','true');
+      el.setAttribute('data-id', off.id);
+      el.innerHTML = `
+        <div class="sym">${off.symbol}</div>
+        <div class="txt">
+          <b>${off.name}</b>
+          <small>${off.tags.join(' · ')}</small>
+        </div>
+      `;
+      el.addEventListener('dragstart', onDragStart);
+      el.addEventListener('dragend', onDragEnd);
+      list.appendChild(el);
+    });
+  }
+  function onDragStart(e){
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
+    document.getElementById('dropTarget').classList.add('active');
+  }
+  function onDragEnd(){
+    document.getElementById('dropTarget').classList.remove('active');
+  }
+
+  /* 阵心拖拽投放 */
+  const drop = document.getElementById('dropTarget');
+  drop.addEventListener('dragover', e=>{e.preventDefault();});
+  drop.addEventListener('drop', e=>{
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    chooseOffering(id);
+    drop.classList.remove('active');
+  });
+
+  function chooseOffering(id){
+    if(state.selected.includes(id)) { toast('已投入此祭品'); return; }
+    if(state.selected.length>=3){ toast('祭品已足，请等待术式'); return; }
+    const found = state.offerings.find(o=>o.id===id);
+    if(!found) return;
+    state.selected.push(id);
+    // 吸收动画
+    absorbEffect();
+    renderChips();
+    flashShock();
+    setProgress();
+    if(state.selected.length===3){
+      setTimeout(summon, 680);
+    }
+  }
+  function renderChips(){
+    const chips = document.getElementById('chips');
+    chips.innerHTML = '';
+    state.selected.forEach(id=>{
+      const o = state.offerings.find(x=>x.id===id);
+      const el = document.createElement('div');
+      el.className = 'chip';
+      el.textContent = `${o.symbol} ${o.name}`;
+      chips.appendChild(el);
+    });
+  }
+  function setProgress(){
+    const p = document.getElementById('progress');
+    p.textContent = `已选 ${state.selected.length} / 3`;
+  }
+  function absorbEffect(){
+    const l = document.getElementById('fxLayer');
+    const s = document.createElement('div');
+    s.className='shockwave';
+    l.appendChild(s);
+    setTimeout(()=>s.remove(), 900);
+  }
+  function flashShock(){ /* 可叠加细屑 */
+    spawnParticlesBurst();
+  }
+
+  /* 召唤逻辑：阵型 + 祭品组合 */
+  function summon(){
+    const picks = state.selected.map(id=>state.offerings.find(o=>o.id===id));
+    const tags = picks.reduce((acc,o)=>{o.tags.forEach(t=>acc.add(t)); return acc;}, new Set());
+    const tset = (arr)=>arr.every(t=>tags.has(t));
+
+    // 优先匹配特定配方
+    let result = null;
+    const core = state.core;
+
+    const recipes = [
+      // Infernal
+      {core:'infernal', need:['blood','sulfur','iron'], race:'恶魔', fx:'inferno'},
+      {core:'infernal', need:['blood','moon','mirror'], race:'吸血鬼', fx:'sanguis'},
+      {core:'infernal', need:['lust','rose','mirror'], race:'魅魔', fx:'charm'}, // 通过“life/thorn/illusion”近似欲念
+      {core:'infernal', need:['lust','moon','thorn'], race:'淫魔', fx:'charm'},
+      {core:'infernal', need:['death','salt','shadow'], race:'死灵', fx:'necrosis'},
+      // Sylvan
+      {core:'sylvan', need:['wood','herb','life'], race:'精灵', fx:'verdant'},
+      {core:'sylvan', need:['stone','iron','order'], race:'矮人', fx:'forge'},
+      {core:'sylvan', need:['beast','moon','herb'], race:'狼人', fx:'lupus'},
+      {core:'sylvan', need:['nature','water','lotus'], race:'树精', fx:'bloom'},
+      // Astral
+      {core:'astral', need:['star','silver','moon'], race:'天妖（星界）', fx:'cosmos'},
+      {core:'astral', need:['void','shadow','mercury'], race:'暗影', fx:'umbra'},
+      {core:'astral', need:['aether','order','glass'], race:'巨灵（以太）', fx:'djinn'},
+      {core:'astral', need:['storm','air','fire'], race:'火蜥/萨拉曼达', fx:'storm'},
+      // Cross
+      {core:'infernal', need:['thorn','blood','fire'], race:'地狱犬使魔', fx:'inferno'},
+      {core:'sylvan', need:['amber','ancient','sun'], race:'森林仙灵', fx:'verdant'},
+      {core:'astral', need:['ancient','fate','star'], race:'命运织者', fx:'cosmos'},
+    ];
+
+    for(const r of recipes){
+      if(r.core===core && tset(r.need)){ result = {race:r.race, fx:r.fx}; break; }
+    }
+
+    // 无特配：按阵型权重推断
+    if(!result){
+      const score = tagScore(tags, core);
+      result = weightedResult(score, core);
+    }
+
+    // 命名与故事
+    const name = makeName(result.race);
+    const story = makeStory(result.race, name, picks);
+
+    // 视觉特效
+    summonFX(result.fx);
+
+    // 弹窗
+    showSummon(name + ' · ' + result.race, story);
+
+    // 重置
+    setTimeout(resetAll, 5200);
+  }
+
+  function tagScore(tags, core){
+    const t = {};
+    const add = (k,v=1)=>t[k]=(t[k]||0)+v;
+
+    tags.forEach(tag=>add(tag,1));
+    // 核心阵型偏置
+    if(core==='infernal'){ add('fire',2); add('blood',2); add('shadow',1); }
+    if(core==='sylvan'){ add('nature',2); add('herb',2); add('life',1); add('beast',1); }
+    if(core==='astral'){ add('astral',3); add('star',2); add('moon',1); add('aether',2); }
+
+    return t;
+  }
+  function weightedResult(score, core){
+    const get = k => score[k]||0;
+    if(core==='infernal'){
+      if(get('blood')+get('fire')+get('iron')>=5) return {race:'恶魔', fx:'inferno'};
+      if(get('blood')+get('moon')+get('shadow')>=4) return {race:'吸血鬼', fx:'sanguis'};
+      if(get('thorn')+get('illusion')+get('life')>=3) return {race:'魅魔', fx:'charm'};
+      return {race:'地狱眷灵', fx:'inferno'};
+    }
+    if(core==='sylvan'){
+      if(get('nature')+get('herb')+get('life')>=5) return {race:'精灵', fx:'verdant'};
+      if(get('iron')+get('stone')+get('order')>=4) return {race:'矮人', fx:'forge'};
+      if(get('beast')+get('moon')>=3) return {race:'狼人', fx:'lupus'};
+      return {race:'树精', fx:'bloom'};
+    }
+    if(core==='astral'){
+      if(get('star')+get('silver')+get('moon')>=5) return {race:'天妖（星界）', fx:'cosmos'};
+      if(get('void')+get('shadow')+get('aether')>=4) return {race:'暗影', fx:'umbra'};
+      if(get('aether')+get('order')+get('glass')>=4) return {race:'巨灵（以太）', fx:'djinn'};
+      return {race:'星尘使徒', fx:'cosmos'};
+    }
+    return {race:'异乡访客', fx:'cosmos'};
+  }
+
+  /* 效果集 */
+  function summonFX(kind){
+    // 强化一次冲击波
+    absorbEffect();
+    // 附带系特效
+    if(kind==='inferno') burstEmbers();
+    if(kind==='verdant') burstLeaves();
+    if(kind==='cosmos')  burstStardust();
+    if(kind==='sanguis') veilScarlet();
+    if(kind==='umbra')   burstShadows();
+    if(kind==='djinn')   burstBubbles();
+    if(kind==='lupus')   moonHowl();
+    if(kind==='forge')   forgeSparks();
+    if(kind==='bloom')   bloomPulse();
+    if(kind==='storm')   stormCrackle();
+    if(kind==='charm')   charmVeil();
+    if(kind==='necrosis') necroFrost();
+  }
+
+  function posCenter(){
+    const rect = document.querySelector('.drop-target').getBoundingClientRect();
+    return {x: rect.left + rect.width/2, y: rect.top + rect.height/2};
+  }
+
+  function spawnParticlesBurst(n=80, color= getComputedStyle(document.documentElement).getPropertyValue('--glow').trim()){
+    const layer = document.getElementById('fxLayer');
+    const {x,y} = posCenter();
+    for(let i=0;i<n;i++){
+      const e = document.createElement('div');
+      e.className='ember';
+      e.style.background = color;
+      e.style.left = x+'px'; e.style.top = y+'px';
+      e.style.boxShadow = '0 0 10px '+color;
+      layer.appendChild(e);
+      const ang = Math.random()*Math.PI*2;
+      const dist = 40 + Math.random()*320;
+      const dx = Math.cos(ang)*dist, dy = Math.sin(ang)*dist;
+      const dur = 500 + Math.random()*900;
+      e.animate([
+        {transform:`translate(-50%,-50%) translate(0,0)`, opacity:1},
+        {transform:`translate(-50%,-50%) translate(${dx}px,${dy}px)`, opacity:0}
+      ], {duration:dur, easing:'cubic-bezier(.2,.6,.2,1)'})
+      .onfinish = ()=> e.remove();
+    }
+  }
+  function burstEmbers(){ spawnParticlesBurst(120, 'rgba(255,80,60,.95)'); }
+  function burstLeaves(){
+    const layer = document.getElementById('fxLayer'); const {x,y} = posCenter();
+    for(let i=0;i<56;i++){
+      const leaf = document.createElement('div'); leaf.className='leaf';
+      leaf.style.background='linear-gradient(180deg, #8fd9a8, #29604b)'; leaf.style.borderRadius='2px 10px';
+      leaf.style.left=x+'px'; leaf.style.top=y+'px';
+      layer.appendChild(leaf);
+      const ang = (Math.random()*Math.PI*2), dist= 60+Math.random()*360;
+      const dx = Math.cos(ang)*dist, dy = Math.sin(ang)*dist;
+      leaf.animate([{transform:'translate(-50%,-50%) rotate(0deg)', opacity:1},
+        {transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) rotate(${360*Math.random()}deg)`, opacity:0}],
+        {duration:1200+Math.random()*1200, easing:'ease-out'}).onfinish=()=>leaf.remove();
+    }
+  }
+  function burstStardust(){
+    const colors = ['#9db3ff','#cdd7ff','#7aa4ff','#e8ecff'];
+    for(let i=0;i<4;i++) spawnParticlesBurst(70, colors[i%colors.length]);
+  }
+  function veilScarlet(){
+    const lay = document.getElementById('fxLayer');
+    const v = document.createElement('div');
+    v.style.position='absolute'; v.style.inset='0'; v.style.background='radial-gradient(600px 600px at 50% 50%, rgba(160,20,30,.45), rgba(0,0,0,0))';
+    v.style.pointerEvents='none'; v.style.opacity='0';
+    lay.appendChild(v);
+    v.animate([{opacity:0},{opacity:1},{opacity:0}],{duration:1500,easing:'ease-out'}).onfinish=()=>v.remove();
+  }
+  function burstShadows(){
+    const layer = document.getElementById('fxLayer'); const {x,y} = posCenter();
+    for(let i=0;i<90;i++){
+      const m = document.createElement('div'); m.className='shadow-mote';
+      m.style.background='rgba(10,10,14,.9)'; m.style.boxShadow='0 0 12px rgba(10,10,14,.8)';
+      m.style.left=x+'px'; m.style.top=y+'px'; layer.appendChild(m);
+      const ang = Math.random()*Math.PI*2; const dist = 30+Math.random()*320;
+      const dx=Math.cos(ang)*dist, dy=Math.sin(ang)*dist;
+      m.animate([{transform:'translate(-50%,-50%) scale(1)', opacity:.95},{transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(0.8)`, opacity:0}],
+        {duration:1200+Math.random()*900, easing:'cubic-bezier(.2,.6,.2,1)'}).onfinish=()=>m.remove();
+    }
+  }
+  function burstBubbles(){
+    const layer = document.getElementById('fxLayer'); const {x,y} = posCenter();
+    for(let i=0;i<60;i++){
+      const b = document.createElement('div'); b.className='bubble';
+      b.style.background='radial-gradient(circle,#b7f0ff,#3a6a8a)'; b.style.boxShadow='0 0 10px rgba(100,180,220,.6)';
+      b.style.left=x+'px'; b.style.top=y+'px'; layer.appendChild(b);
+      const dx = (Math.random()*2-1)*300, dy = (Math.random()*-1)*360;
+      b.animate([{transform:'translate(-50%,-50%) scale(.8)', opacity:1},{transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(1.2)`, opacity:0}],
+        {duration:1600+Math.random()*800, easing:'ease-out'}).onfinish=()=>b.remove();
+    }
+  }
+  function moonHowl(){ veilTint('rgba(120,150,210,.35)'); }
+  function forgeSparks(){ spawnParticlesBurst(140, 'rgba(255,210,120,.95)'); }
+  function bloomPulse(){ veilTint('rgba(80,200,140,.35)'); }
+  function stormCrackle(){ spawnParticlesBurst(110, 'rgba(160,190,255,.95)'); }
+  function charmVeil(){ veilTint('rgba(200,140,200,.35)'); }
+  function necroFrost(){ veilTint('rgba(160,210,220,.25)'); }
+
+  function veilTint(color){
+    const lay = document.getElementById('fxLayer');
+    const v = document.createElement('div');
+    v.style.position='absolute'; v.style.inset='0'; v.style.background=`radial-gradient(700px 700px at 50% 50%, ${color}, rgba(0,0,0,0))`;
+    v.style.pointerEvents='none'; v.style.opacity='0';
+    lay.appendChild(v);
+    v.animate([{opacity:0},{opacity:1},{opacity:0}],{duration:1600,easing:'ease-out'}).onfinish=()=>v.remove();
+  }
+
+  /* 召唤展示 */
+  function showSummon(title, story){
+    const ov = document.getElementById('summonOverlay');
+    const tt = document.getElementById('summonTitle');
+    const st = document.getElementById('summonStory');
+    tt.textContent = title;
+    st.innerHTML = story;
+    ov.style.display='flex';
+  }
+
+  function resetAll(){
+    state.selected = [];
+    renderChips();
+    setProgress();
+    randomPool();
+    document.getElementById('summonOverlay').style.display='none';
+  }
+
+  /* 简易命名与故事生成 */
+  function makeName(race){
+    const tables = {
+      '恶魔': ['Azagor','Varkhul','Noctharis','Morvex','Zerathan'],
+      '吸血鬼': ['Seraphyne','Valmor','Nyxander','Liliane','Corvus'],
+      '魅魔': ['Morgalia','Selistra','Vaelith','Lyrissa','Morwen'],
+      '淫魔': ['Veridan','Zepharos','Kaelen','Drevon','Lucien'],
+      '死灵': ['Neruth','Ossara','Mordain','Sableth','Graven'],
+      '精灵': ['Elarion','Sylthiel','Aerendir','Nerissa','Faeris'],
+      '矮人': ['Thrain','Bromgar','Durgan','Keldra','Harkin'],
+      '狼人': ['Raghar','Ulric','Varyn','Skoll','Fenric'],
+      '树精': ['Drylia','Oakhen','Myrcella','Brindle','Virdra'],
+      '天妖（星界）': ['Astryx','Callindra','Vegael','Orionis','Lyri'],
+      '暗影': ['Umbrix','Noiriel','Tenebris','Umra','Shadren'],
+      '巨灵（以太）': ['Jasif','Zayir','Numeir','Hadran','Seph'],
+      '地狱眷灵':['Immol','Cazrel','Neth','Vor','Azzan'],
+      '星尘使徒':['Aster','Sidra','Polaris','Navar','Serin']
+    };
+    const arr = tables[race] || ['Aurel','Veyra','Kael','Mira','Orin'];
+    return arr[Math.floor(Math.random()*arr.length)];
+  }
+
+  function makeStory(race, name, picks){
+    const list = picks.map(o=>`${o.symbol} ${o.name}`).join('、');
+    const base = `以 ${list} 为引，术式完成闭环，门扉在阵心悄然开启。`;
+const tails = {
+      '恶魔': `${name} 的到来并未伴随烈焰，而是伴随绝对的寂静与冰冷的几何学。祂的嗓音是碎裂的黑曜石，祂说：“我收割逻辑的终点，见证宇宙的热寂。我不需要你的灵魂……只需你一个被遗忘的、真实的恐惧。”`,
+      '吸血鬼': `阵法中央没有身影，只有一缕陈年檀木与枯萎玫瑰的气息。${name} 的声音在你耳边响起，仿佛来自你的血脉深处：“我绘制过无数帝国的兴衰版图，只为寻找一种味道——那是一个被彻底遗忘的誓言的味道。你身上，有它的回响。”`,
+      '魅魔': `空气中弥漫着蜜糖与夜露的甜香，${name} 的轮廓在光与影的边缘摇曳，如一段不应存在的旋律。祂轻笑道：“我编织最华美的梦境，也缝制最精致的哀伤。告诉我，你最不敢奢求的愿望是什么？我将用它来为你构筑一座完美的牢笼。”`,
+      '淫魔': `你并未看到祂，只是感觉影子被拉长，仿佛要脱离身体。${name} 的低语带着古老岩石的质感，直接在你的意识中响起：“我是欲望的根须，是所有执念的锚点。别抗拒，让我看看你为了得到，愿意失去什么。”`,
+      '死灵': `一阵寒意并非来自低温，而是来自时间的流逝。${name} 手持一盏以记忆为灯油的提灯，祂的形态是风中摇曳的裹尸布。“我为历史的空白处添加注脚。请借我一缕你的悔恨，某个亡魂的故事，需要一个恰当的结尾。”`,
+      '精灵': `光线仿佛被古老森林的枝叶过滤，在空气中投下斑驳的、会呼吸的影子。${name} 的双眸里沉淀着星辰的轨迹，祂说：“万物皆有其真名。我愿以一片森林的寂静，换取你听见的第一声风的名字。”`,
+      '矮人': `你听到的不是锤声，而是地脉深处沉稳的心跳。${name} 身上带着金属冷却和岩石的味道，他用手感受着召唤阵的石基，沉声问：“我寻找世间最坚韧之物。不是钻石，不是钢铁，而是在重压下仍未被磨灭的——一个承诺。”`,
+      '狼人': `月光被无形的力量抽走，汇聚成 ${name} 矫健而矛盾的身形。野性与人性在祂的金色瞳孔中交战。祂不发一言，只是深深地嗅闻着空气，仿佛在分辨你灵魂深处，究竟是猎物的恐惧，还是同类的孤独。`,
+      '树精': `召唤阵的线条上长出了细微的苔藓与藤蔓，${name} 从大地中缓缓升起，身躯是千年古木的形态。祂的意识通过植物的根系与你相连：“我感受过一万次枯荣。告诉我，在你短暂的生命里，哪一次凋零，让你觉得比盛放更美？”`,
+      '天妖（星界）': `空间如碎裂的镜片般折叠，${name} 从星辰的裂隙中走出，身后拖曳着彗星的尘埃。祂的声音清冷如真空：“我追寻着一个走失的引力。它曾维系一个星系的平衡，最后一次被观测到，是藏匿于一个凡人的梦中。”`,
+      '暗影': `你的影子背叛了你，它流动、汇聚，构成了 ${name} 的形态，一个没有实体的虚无。祂的声音是无数窃窃私语的集合：“光定义了你的边界，而我，定义了你的深度。让我看看，在你影子所及之处，藏着什么连你自己都害怕的宝藏？”`,
+      '巨灵（以太）': `空气变得粘稠，仿佛凝结成水晶。${name} 在这片凝固的时空中现身，身形由纯粹的能量与秩序构成。祂的声音是和谐的晶体共振：“我负责修正现实的瑕疵。在你的命运中，我发现了一个微小的逻辑悖论，需要你的许可才能将其抹除。你，愿意吗？”`,
+      '地狱犬使魔': `${name} 并非被召唤而来，而是循着你灵魂中契约的焦痕自己找来的。它匍匐在地，喉咙里发出滚雷般的低吼，眼中燃烧着忠诚与饥饿的火焰。它在等待一道命令，无论那命令指向你的敌人，还是指向你自己。`,
+      '星尘使徒': `${name} 的身体由无数即将熄灭的星尘构成，微弱的光芒如同宇宙最后的叹息。祂伸出手，掌心托着一颗尚有余温的微型中子星，轻声说：“这是一个宇宙的遗骸。请为它许一个愿望，让它的下一个轮回，能有一个梦的起点。”`,
+      '森林仙灵': `一阵风铃般的笑声过后，${name} 骑着一只甲虫，从一片旋转的叶子上跳下来。祂的翅膀上沾满了花粉与晨露。祂不好奇你的力量，只好奇你口袋里那块最光滑的石头，并愿意用“一个夏天的秘密”来交换。`,
+      '命运织者': `你的视线被无数金色的丝线占据，${name} 就在这些因果之线的中央，祂既是织者，也是织物本身。祂看向你，仿佛看到了你的过去与未来。祂问：“在你的一生中，有一根丝线即将断裂。告诉我，你希望它是代表‘机遇’的那根，还是代表‘羁绊’的那根？”`,
+      'default': '来客的身影在现实与虚幻之间摇曳，祂的目光似乎穿透了你，望向某个更深邃的所在。祂沉默着，仿佛在评估这次相遇的价值，以及你是否有资格聆听祂的故事。'
+    };
+
+    // 如果没匹配到，返回一个默认故事
+    return `${base}<br><br>${tails[race] || '来客打量着你的世界，沉默而好奇。'}`;
+  }
+
+  /* 提示 */
+  function toast(msg, ms=1200){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display='block';
+    setTimeout(()=>t.style.display='none', ms);
+  }
+
+  /* 光标系统 */
+  const cDot = document.getElementById('cDot');
+  const cRing = document.getElementById('cRing');
+  let cx=0, cy=0, rx=0, ry=0;
+  window.addEventListener('mousemove', e=>{
+    cx = e.clientX; cy = e.clientY;
+    cDot.style.transform = `translate(${cx-3}px,${cy-3}px)`;
+  });
+  function tickCursor(){
+    rx += (cx - rx)*0.15; ry += (cy - ry)*0.15;
+    cRing.style.transform = `translate(${rx-12}px,${ry-12}px)`;
+    requestAnimationFrame(tickCursor);
+  }
+  tickCursor();
+  // 光标尾迹符文
+  const tailRunes = ['ᚠ','ᚢ','ᚦ','ᚨ','ᚱ','ᛉ','✠','✢','✣','✤','✥','✦','✧'];
+  let lastTail = 0;
+  window.addEventListener('mousemove', e=>{
+    const now = performance.now();
+    if(now - lastTail > 36){
+      lastTail = now;
+      const r = document.createElement('div');
+      r.className='rune-tail';
+      r.textContent = tailRunes[Math.floor(Math.random()*tailRunes.length)];
+      r.style.left = (e.clientX + (Math.random()*8-4)) + 'px';
+      r.style.top  = (e.clientY + (Math.random()*8-4)) + 'px';
+      r.style.color = getComputedStyle(document.documentElement).getPropertyValue('--ink');
+      document.body.appendChild(r);
+      setTimeout(()=>r.remove(), 900);
+    }
+  });
+
+  /* 粒子：环绕召唤阵的漂尘 */
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  let W=0,H=0, PR=window.devicePixelRatio||1, particles=[];
+  let particleColor = themes.infernal.glow;
+  function resize(){
+    W = canvas.clientWidth = canvas.parentElement.clientWidth;
+    H = canvas.clientHeight = canvas.parentElement.clientHeight;
+    canvas.width = W*PR; canvas.height = H*PR; ctx.setTransform(PR,0,0,PR,0,0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function makeParticle(){
+    const cx = window.innerWidth/2, cy= document.querySelector('.stage').getBoundingClientRect().height/2;
+    const r = Math.min(window.innerWidth, window.innerHeight)*0.24 + Math.random()*90;
+    const a = Math.random()*Math.PI*2;
+    return {r, a, speed:(.001+.002*Math.random()), size: 1+Math.random()*1.8, cx, cy, hue: particleColor};
+  }
+  for(let i=0;i<220;i++) particles.push(makeParticle());
+  function step(){
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{
+      p.a += p.speed;
+      const x = p.cx + Math.cos(p.a)*p.r;
+      const y = p.cy + Math.sin(p.a)*p.r*0.66;
+      ctx.fillStyle = p.hue;
+      ctx.globalAlpha = .25;
+      ctx.beginPath(); ctx.arc(x,y,p.size,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+    requestAnimationFrame(step);
+  }
+  step();
+
+  /* 阵型切换事件 */
+  document.querySelectorAll('.sigil-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>switchDesign(btn.dataset.core));
+  });
+
+  /* 工具 */
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+  /* 启动 */
+  buildDesigns();
+  randomPool();
+  setProgress();
+
+})();
+</script>
+</body>
+</html>
