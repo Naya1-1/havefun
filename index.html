@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
-<title>哥特召唤术式 · Arcana Obscura</title>
+<title>欢迎来玩【拾梦】超轻Gemini预设</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=UnifrakturCook:wght@700&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -22,7 +22,6 @@
   }
   *{box-sizing:border-box}
   html,body{height:100%;background:var(--bg);overflow:hidden;color:var(--ink);font-family: "Cinzel","IM Fell English SC",serif;cursor:none}
-  /* 背景：深邃放射+暗纹噪点+渐变雾 */
   body:before{
     content:"";
     position:fixed;inset:0;
@@ -55,7 +54,7 @@
     .app{grid-template-columns:1fr;grid-template-rows: auto auto 1fr}
   }
 
-  /* 召唤阵区域 */
+  /
   .stage{
     position:relative;display:flex;align-items:center;justify-content:center;
     overflow:hidden;
@@ -88,7 +87,6 @@
     55%{ opacity:.78 }
   }
 
-  /* 掉落目标（阵心） */
   .drop-target{
     position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     width:180px;height:180px;border-radius:50%;
@@ -103,7 +101,6 @@
     transform:translate(-50%,-50%) scale(1.06);
   }
 
-  /* 顶部：阵型切换 */
   .topbar{
     grid-column:1/-1; display:flex; align-items:center; justify-content:space-between;
     padding:12px 16px; background:linear-gradient(to right, rgba(20,20,28,.85), rgba(12,12,16,.6));
@@ -122,7 +119,6 @@
   .sigil-btn small{font-family:"IM Fell English SC",serif;letter-spacing:.1em;color:var(--muted)}
   .sigil-btn.active{color:var(--ink);border-color:var(--ink); box-shadow:inset 0 0 20px rgba(255,230,200,.06), 0 0 12px rgba(255,230,200,.04)}
   .sigil-btn:hover{transform:translateY(-1px)}
-  /* 祭品面板 */
   .panel{
     background: radial-gradient(800px 400px at 10% 0%, rgba(120,90,50,.08), transparent 60%), var(--panel);
     border-right:1px solid rgba(200,190,160,.12);
@@ -160,7 +156,6 @@
     .offer-list{grid-template-columns:repeat(5,1fr); max-height:none}
   }
 
-  /* 提示与故事Modal */
   .toast{
     position:fixed; left:50%; top:6%; transform:translateX(-50%);
     padding:6px 12px; background:rgba(20,20,26,.84); border:1px solid rgba(220,210,180,.2);
@@ -184,7 +179,7 @@
   .card-glow{position:absolute; inset:-2px; pointer-events:none; border:1px solid rgba(250,230,210,.08)}
   .close-hint{position:absolute; right:12px; top:8px; font-size:12px; color:var(--muted)}
 
-  /* 光标系统 */
+  /
   .cursor-dot,.cursor-ring{
     position:fixed; left:0; top:0; pointer-events:none; z-index:60; mix-blend-mode:screen
   }
@@ -200,7 +195,7 @@
     100%{opacity:0; transform:translateY(-16px) scale(0.9)}
   }
 
-  /* 召唤冲击波/火焰/落叶/星尘等效果容器 */
+  /
   .fx-layer{position:absolute; inset:0; pointer-events:none}
   .shockwave{
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -216,7 +211,7 @@
     position:absolute; width:4px; height:4px; border-radius:50%; opacity:.9
   }
 
-  /* SVG滤镜 */
+  /
   svg#circle defs + g {}
 </style>
 </head>
@@ -229,15 +224,15 @@
       <div class="rules">拖入任意三件祭品到阵心唤起异界来客。可切换核心法阵，改变召唤谱系。</div>
     </div>
     <div class="switcher">
-      <div class="sigil-btn active" data-core="infernal" title="地狱法阵·Infernum">
+      <div class="sigil-btn active" data-core="infernal" title="地狱·Infernum">
         <div class="icon">✠</div>
         <small>INFERNUM</small>
       </div>
-      <div class="sigil-btn" data-core="sylvan" title="密林法阵·Sylva">
+      <div class="sigil-btn" data-core="sylvan" title="密林·Sylva">
         <div class="icon">✽</div>
         <small>SYLVA</small>
       </div>
-      <div class="sigil-btn" data-core="astral" title="星界法阵·Astra">
+      <div class="sigil-btn" data-core="astral" title="星界·Astra">
         <div class="icon">✶</div>
         <small>ASTRA</small>
       </div>
@@ -317,7 +312,6 @@
 
 <script>
 ;(() => {
-  /* 全局状态 */
   const state = {
     core: 'infernal',      // 当前阵型 infernal/sylvan/astral
     selected: [],          // 已投祭品 id
@@ -325,14 +319,12 @@
     offerings: [],         // 全量祭品表
   };
 
-  /* 配色集 */
   const themes = {
     infernal: {accent:'#a31419', accent2:'#3e0a0f', glow:'#ff3a2f'},
     sylvan:   {accent:'#267a54', accent2:'#0f3a2a', glow:'#66e0b1'},
     astral:   {accent:'#4b5f9e', accent2:'#1a203a', glow:'#8aa8ff'},
   };
 
-  /* 初始化符号祭品（≥60） */
   const O = (id,name,symbol,tags)=>({id,name,symbol,tags});
   state.offerings = [
     // 血影/冥渊
@@ -434,7 +426,6 @@
   ];
   // 去重符号（上例中个别符号重复仅作风格用途）
 
-  /* 三种召唤阵生成 */
   function buildDesigns(){
     const g = document.getElementById('designs');
     g.innerHTML = '';
@@ -602,7 +593,6 @@
     return `M${x} ${y} C ${x-rx} ${y+ry*0.55}, ${x+rx} ${y+ry*0.55}, ${x} ${y}`;
   }
 
-  /* 阵型切换与主题 */
   function switchDesign(core){
     state.core = core;
     document.querySelectorAll('.sigil-btn').forEach(b=>b.classList.toggle('active', b.dataset.core===core));
@@ -619,7 +609,6 @@
     particleColor = t.glow;
   }
 
-  /* UI：祭品面板 */
   function randomPool(){
     // 随机10
     const idx = [...Array(state.offerings.length).keys()];
@@ -655,7 +644,6 @@
     document.getElementById('dropTarget').classList.remove('active');
   }
 
-  /* 阵心拖拽投放 */
   const drop = document.getElementById('dropTarget');
   drop.addEventListener('dragover', e=>{e.preventDefault();});
   drop.addEventListener('drop', e=>{
@@ -706,7 +694,6 @@
     spawnParticlesBurst();
   }
 
-  /* 召唤逻辑：阵型 + 祭品组合 */
   function summon(){
     const picks = state.selected.map(id=>state.offerings.find(o=>o.id===id));
     const tags = picks.reduce((acc,o)=>{o.tags.forEach(t=>acc.add(t)); return acc;}, new Set());
@@ -798,11 +785,8 @@
     return {race:'异乡访客', fx:'cosmos'};
   }
 
-  /* 效果集 */
   function summonFX(kind){
-    // 强化一次冲击波
     absorbEffect();
-    // 附带系特效
     if(kind==='inferno') burstEmbers();
     if(kind==='verdant') burstLeaves();
     if(kind==='cosmos')  burstStardust();
@@ -927,7 +911,6 @@
     document.getElementById('summonOverlay').style.display='none';
   }
 
-  /* 简易命名与故事生成 */
   function makeName(race){
     const tables = {
       '恶魔': ['Azagor','Varkhul','Noctharis','Morvex','Zerathan'],
@@ -1049,15 +1032,12 @@ const tails = {
   }
   step();
 
-  /* 阵型切换事件 */
   document.querySelectorAll('.sigil-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>switchDesign(btn.dataset.core));
   });
 
-  /* 工具 */
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
-  /* 启动 */
   buildDesigns();
   randomPool();
   setProgress();
@@ -1066,3 +1046,4 @@ const tails = {
 </script>
 </body>
 </html>
+
